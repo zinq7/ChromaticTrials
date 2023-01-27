@@ -10,7 +10,7 @@ using RoR2.ExpansionManagement;
 using RoR2.UI; // LOBBYCONFIG API is for adding bars such as "expansions"
 using System.Text;
 
-namespace SpeedyBirb
+namespace ChromaticTrials
 {
     //This attribute specifies that we have a dependency on R2API, as we're using it to add our item to the game.
     //You don't need this if you're not using R2API in your plugin, it's just to tell BepInEx to initialize R2API before this plugin so it's safe to use R2API.
@@ -21,7 +21,7 @@ namespace SpeedyBirb
 
     //This is the main declaration of our plugin class. BepInEx searches for all classes inheriting from BaseUnityPlugin to initialize on startup.
     //BaseUnityPlugin itself inherits from MonoBehaviour, so you can use this as a reference for what you can declare and use in your plugin class: https://docs.unity3d.com/ScriptReference/MonoBehaviour.html
-    public class SpeedyBirb : BaseUnityPlugin
+    public class ChromaticTrials : BaseUnityPlugin
     {
 
         public static Lobby lobby;

@@ -1,8 +1,8 @@
 ﻿{
-	"name": "MyFirstMod",
-	"version_number": "1.0.0",
+	"name": "ChromaticTrials",
+	"version_number": "1.0.1",
 	"website_url": "",
-	"description": "My first Mod",
+	"description": "WIP override of the Prismatic Trials gamemode that allows you to create and join lobbies with friends",
 	"dependencies": [
 		"bbepis-BepInExPack-5.4.9",
 		"RiskofThunder-HookGenPatcher-1.2.1"

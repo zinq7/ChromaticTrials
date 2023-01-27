@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace SpeedyBirb
+namespace ChromaticTrials
 {
     public class Speen : MonoBehaviour
     {

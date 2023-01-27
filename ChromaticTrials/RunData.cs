@@ -1,5 +1,6 @@
 ﻿using System;
-namespace SpeedyBirb {
+namespace ChromaticTrials
+{
     [Serializable]
     public class RunData
     {

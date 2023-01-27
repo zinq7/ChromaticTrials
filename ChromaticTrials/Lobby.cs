@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace SpeedyBirb
+namespace ChromaticTrials
 {
     [Serializable]
     public class Lobby

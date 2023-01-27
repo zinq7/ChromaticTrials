@@ -1,6 +1,6 @@
 ﻿using BepInEx.Logging;
 
-namespace SpeedyBirb
+namespace ChromaticTrials
 {
     internal static class Log
     {
