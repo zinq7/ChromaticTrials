@@ -78,13 +78,21 @@ namespace ChromaticTrials
         private void CreateHooks(On.RoR2.WeeklyRun.orig_Start orig, WeeklyRun self)
         {
             crystalRng  = new Xoroshiro128Plus(self.treasureRng);
-            On.RoR2.Artifacts.SacrificeArtifactManager.OnServerCharacterDeath += No;
-            On.RoR2.CharacterBody.OnDeathStart += CrystalMeUp; // change artifact of sacrifice affects
+
+            if (lobby.crystalsDropItems)
+            {
+                On.RoR2.Artifacts.SacrificeArtifactManager.OnServerCharacterDeath += No;
+                On.RoR2.CharacterBody.OnDeathStart += CrystalMeUp; // change artifact of sacrifice affects
+            }
+            
         }
         private void UndoHooks(On.RoR2.WeeklyRun.orig_OnClientGameOver orig, WeeklyRun self, RunReport runReport)
         {
-            On.RoR2.Artifacts.SacrificeArtifactManager.OnServerCharacterDeath -= No;
-            On.RoR2.CharacterBody.OnDeathStart -= CrystalMeUp;
+            if (lobby.crystalsDropItems)
+            {
+                On.RoR2.Artifacts.SacrificeArtifactManager.OnServerCharacterDeath -= No;
+                On.RoR2.CharacterBody.OnDeathStart -= CrystalMeUp;
+            }
         }
 
         private void CrystalMeUp(On.RoR2.CharacterBody.orig_OnDeathStart orig, CharacterBody self)
