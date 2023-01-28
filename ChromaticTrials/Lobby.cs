@@ -15,5 +15,6 @@ namespace ChromaticTrials
         public int stages;
         public bool crystalsDropItems, vengeancifyBossTwo;
         public int lobbyID;
+        public int stageCount, crystalCount, crystalsRequired;
     }
 }

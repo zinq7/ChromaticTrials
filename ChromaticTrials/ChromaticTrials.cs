@@ -60,10 +60,14 @@ namespace ChromaticTrials
             On.RoR2.WeeklyRun.OverrideRuleChoices += MyRules;
             On.RoR2.WeeklyRun.ClientSubmitLeaderboardScore += SubmitToMe;
 
-            On.RoR2.WeeklyRun.Start += (orig, self) => { orig(self); UndoHooks(); }; // undo the hooks from the previous runs?
-            On.RoR2.UI.WeeklyRunScreenController.OnEnable += (orig, self) => { orig(self); UndoHooks(); };
+            On.RoR2.CharacterBody.Start += GiveZinqLoot;
 
+            On.RoR2.WeeklyRun.Start += (orig, self) => { orig(self); UndoHooks(); }; // undo the hooks from the previous runs?
+            On.RoR2.UI.WeeklyRunScreenController.OnEnable += (orig, self) => { orig(self); UndoHooks(); }; // overly undo the hooks in case
             On.RoR2.WeeklyRun.Start += CreateHooks;
+
+            On.RoR2.WeeklyRun.AdvanceStage += BetterVictoryCheck;
+            On.RoR2.Run.AdvanceStage += DoTrialExtension;
 
             On.RoR2.UI.WeeklyRunScreenController.OnEnable += SpawnHOOF;
 
@@ -74,6 +78,46 @@ namespace ChromaticTrials
 
             // This line of log will appear in the bepinex console when the Awake method is done.
             Log.LogInfo(nameof(Awake) + " done.");
+        }
+
+        private void GiveZinqLoot(On.RoR2.CharacterBody.orig_Start orig, CharacterBody self)
+        {
+            orig(self);
+
+            if (self.isPlayerControlled)
+            {
+                self.inventory.GiveItem(RoR2Content.Items.Hoof, 25);
+                self.inventory.GiveItem(RoR2Content.Items.Crowbar, 25);
+                self.inventory.GiveItem(RoR2Content.Items.Feather, 25);
+            }
+        }
+
+        bool extended = false;
+        private void BetterVictoryCheck(On.RoR2.WeeklyRun.orig_AdvanceStage orig, WeeklyRun self, SceneDef nextScene)
+        {
+            // using WolfoQOL's code because this part is hard to get around due to inheritence
+            if (self.stageClearCount >= lobby.stageCount - 1)
+            {
+                self.BeginGameOver(RoR2Content.GameEndings.PrismaticTrialEnding);
+            } 
+            else
+            {
+                if (self.stageClearCount == 1 && SceneInfo.instance.countsAsStage)
+                {
+                    self.stageClearCount = 0; // SET THE STAGE CLEAR to 0 to prevent premature ending
+                    extended = true;
+                }
+                orig.Invoke(self, nextScene);
+            }
+        }
+        private void DoTrialExtension(On.RoR2.Run.orig_AdvanceStage orig, Run self, SceneDef nextScene)
+        {
+            if (self.name.StartsWith("WeeklyRun") && extended)
+            {
+                self.stageClearCount = 1; // revert stage clear count
+                extended = false; // undo
+            }
+            orig.Invoke(self, nextScene);
         }
 
         private void CreateHooks(On.RoR2.WeeklyRun.orig_Start orig, WeeklyRun self)
