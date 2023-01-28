@@ -11,8 +11,9 @@ namespace ChromaticTrials
         public string seed;
         public List<string> artifacts, survivors;
         public string time;
-        public string lobbyName;
-        public string hostUsername;
+        public string lobbyName, hostUsername;
+        public int stages;
+        public bool crystalsDropItems;
         public int lobbyID;
     }
 }

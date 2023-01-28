@@ -9,6 +9,7 @@ using System.Net.Http;
 using RoR2.ExpansionManagement;
 using RoR2.UI; // LOBBYCONFIG API is for adding bars such as "expansions"
 using System.Text;
+using R2API;
 
 namespace ChromaticTrials
 {
@@ -33,28 +34,35 @@ namespace ChromaticTrials
 
         public static string username = "zoinq";
         public static AssetBundle bundle;
-        public LobbyList lobbyList;
+        public static LobbyList lobbyList;
+        public static Xoroshiro128Plus crystalRng; 
 
 
         //The Awake() method is run at the very start when the game is initialized.
         public void Awake()
         {
-            bundle = AssetBundle.LoadFromFile(Assembly.GetExecutingAssembly().Location.Replace("SpeedyBirb.dll", "scrollaboardbundle"));
+            bundle = AssetBundle.LoadFromFile(Assembly.GetExecutingAssembly().Location.Replace("ChromaticTrials.dll", "scrollaboardbundle"));
 
             //Init our logging class so that we can properly log for debugging
             Log.Init(Logger);
 
-            
+
             On.RoR2.DisableIfGameModded.OnEnable += No;
+            
             On.RoR2.UI.WeeklyRunScreenController.InitializeLeaderboardInfo += No;
             On.RoR2.UI.WeeklyRunScreenController.UpdateLeaderboard += No;
             On.RoR2.UI.WeeklyRunScreenController.SetCurrentLeaderboard += No;
             On.RoR2.UI.WeeklyRunScreenController.UpdateLeaderboard += No;
             On.RoR2.UI.WeeklyRunScreenController.Update += No;
 
+            On.RoR2.UI.WeeklyRunScreenController.OnEnable += SpawnHOOF;
+
             On.RoR2.WeeklyRun.GenerateSeedForNewRun += SelectLobbySeed;
             On.RoR2.WeeklyRun.OverrideRuleChoices += MyRules;
-            On.RoR2.WeeklyRun.ClientSubmitLeaderboardScore += SubmitToMe; ;
+            On.RoR2.WeeklyRun.ClientSubmitLeaderboardScore += SubmitToMe;
+
+            On.RoR2.WeeklyRun.Start += CreateHooks;
+            On.RoR2.WeeklyRun.OnClientGameOver += UndoHooks;
 
             On.RoR2.UI.WeeklyRunScreenController.OnEnable += SpawnHOOF;
 
@@ -65,7 +73,48 @@ namespace ChromaticTrials
 
             // This line of log will appear in the bepinex console when the Awake method is done.
             Log.LogInfo(nameof(Awake) + " done.");
-            Logger.LogInfo(MsgToSeed("Acrid the prismatic trial") + " -> Acrid the prismatic trial");
+        }
+
+        private void CreateHooks(On.RoR2.WeeklyRun.orig_Start orig, WeeklyRun self)
+        {
+            crystalRng  = new Xoroshiro128Plus(self.treasureRng);
+            On.RoR2.Artifacts.SacrificeArtifactManager.OnServerCharacterDeath += No;
+            On.RoR2.CharacterBody.OnDeathStart += CrystalMeUp; // change artifact of sacrifice affects
+        }
+        private void UndoHooks(On.RoR2.WeeklyRun.orig_OnClientGameOver orig, WeeklyRun self, RunReport runReport)
+        {
+            On.RoR2.Artifacts.SacrificeArtifactManager.OnServerCharacterDeath -= No;
+            On.RoR2.CharacterBody.OnDeathStart -= CrystalMeUp;
+        }
+
+        private void CrystalMeUp(On.RoR2.CharacterBody.orig_OnDeathStart orig, CharacterBody self)
+        {
+            if (self.baseNameToken.Contains("CRYSTAL"))
+            {
+                if (RunArtifactManager.instance.IsArtifactEnabled(ArtifactCatalog.FindArtifactDef("Sacrifice")))
+                    PickupDropletController.CreatePickupDroplet(GetItem(), self.corePosition, Vector3.up * 20f);
+            }            
+
+            orig(self);
+        }
+
+        public PickupIndex GetItem()
+        {           
+            return RoR2.Artifacts.SacrificeArtifactManager.dropTable.GenerateDrop(Run.instance.treasureRng);
+        }
+
+        private void BigCrystalLoot(On.RoR2.Artifacts.SacrificeArtifactManager.orig_CalcCardWeight orig, DirectorCard card, ref float weight)
+        {
+
+            if (card.spawnCard.name == "CrystalSpawnCard")
+            {
+                weight = 100f;
+            }
+
+            Logger.LogInfo(card.spawnCard.name + " -> " + weight);
+
+            orig(card, ref weight);
+
         }
 
         private void SubmitToMe(On.RoR2.WeeklyRun.orig_ClientSubmitLeaderboardScore orig, WeeklyRun self, RunReport runReport)
@@ -117,7 +166,7 @@ namespace ChromaticTrials
             if (lobby != null)
             {
                 return MsgToSeed(lobby.seed);
-            } 
+            }
             else
             {
                 return orig(self);
@@ -172,11 +221,13 @@ namespace ChromaticTrials
             rainbo.AddComponent<Speen>().rt = rainbo.GetComponent<RectTransform>(); // make it speeeeen
 
             // override the size of the leaderboard
+            /*
             RectTransform rectTransform = newLb.GetComponent<RectTransform>();
             rectTransform.anchorMin = new Vector2(0.60f, 0.1f); // bottom left corner
             rectTransform.anchorMax = new Vector2(0.95f, 0.9f); // top right corner (MUST BE BIGGER THAN THE OTHER ONE)
             rectTransform.sizeDelta = Vector2.zero; // autoscale?
             rectTransform.anchoredPosition = Vector2.zero;
+            */
 
             // shift newLb down a layer
             newLb = newLb.transform.Find("Pages").gameObject;
@@ -188,7 +239,7 @@ namespace ChromaticTrials
             }
 
             // READ JSON FILE
-            StreamReader pog = new(Assembly.GetExecutingAssembly().Location.Replace("SpeedyBirb.dll", "lobbies.json"));
+            StreamReader pog = new(Assembly.GetExecutingAssembly().Location.Replace("ChromaticTrials.dll", "lobbies.json"));
             string json = await pog.ReadToEndAsync(); // temp way to get the JSON
             lobbyList = JsonUtility.FromJson<LobbyList>(json);
 
@@ -203,7 +254,8 @@ namespace ChromaticTrials
                 if (lobby != null && lobby.lobbyName == lob.lobbyName)
                 {
                     strip.transform.Find("AmHostHighlight").gameObject.SetActive(true); // only highlight selected lobby
-                } else
+                }
+                else
                 {
                     strip.transform.Find("AmHostHighlight").gameObject.SetActive(false); // unhighlight otherwise
                 }
@@ -271,7 +323,7 @@ namespace ChromaticTrials
                 if (lobbyStrip.name != "-" + lobby.lobbyID)
                 {
                     lobbyStrip.transform.Find("AmHostHighlight").gameObject.SetActive(false);
-                } 
+                }
                 else
                 {
                     lobbyStrip.transform.Find("AmHostHighlight").gameObject.SetActive(true);
@@ -290,11 +342,12 @@ namespace ChromaticTrials
             UpdateLobby(screen); // update to match the current lobby
         }
 
-        private void RefreshLBFile() {
+        private void RefreshLBFile()
+        {
             string jsonFile = JsonUtility.ToJson(lobbyList);
-            FileStream fs = new(Assembly.GetExecutingAssembly().Location.Replace("SpeedyBirb.dll", "lobbies.json"), FileMode.Open);
+            FileStream fs = new(Assembly.GetExecutingAssembly().Location.Replace("ChromaticTrials.dll", "lobbies.json"), FileMode.Open);
             byte[] info = new UTF8Encoding(true).GetBytes(jsonFile);
-            fs.Write(info, 0, info.Length); 
+            fs.Write(info, 0, info.Length);
             //TODO: fix this code and make it function
         }
 
@@ -385,12 +438,11 @@ namespace ChromaticTrials
         }
 
         private void No<T, R>(T no, R nah) { }
-
         private void No<T, R, C>(T no, R nah, C nope) { }
 
-       // private void No<T, R, C, V>(T no, R nah, C nope, V nill) { }
+        // private void No<T, R, C, V>(T no, R nah, C nope, V nill) { }
 
-       // private void No<T, R, C, V, P>(T no, R nah, C nope, V nill, P nuh) { }
+        // private void No<T, R, C, V, P>(T no, R nah, C nope, V nill, P nuh) { }
 
 
     }
