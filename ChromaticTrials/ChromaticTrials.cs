@@ -35,7 +35,6 @@ namespace ChromaticTrials
         public static string username = "zoinq";
         public static AssetBundle bundle;
         public static LobbyList lobbyList;
-        public static Xoroshiro128Plus crystalRng; 
 
 
         //The Awake() method is run at the very start when the game is initialized.
@@ -48,7 +47,7 @@ namespace ChromaticTrials
 
 
             On.RoR2.DisableIfGameModded.OnEnable += No;
-            
+
             On.RoR2.UI.WeeklyRunScreenController.InitializeLeaderboardInfo += No;
             On.RoR2.UI.WeeklyRunScreenController.UpdateLeaderboard += No;
             On.RoR2.UI.WeeklyRunScreenController.SetCurrentLeaderboard += No;
@@ -77,21 +76,50 @@ namespace ChromaticTrials
 
         private void CreateHooks(On.RoR2.WeeklyRun.orig_Start orig, WeeklyRun self)
         {
-            crystalRng  = new Xoroshiro128Plus(self.treasureRng);
+            orig(self);
 
+            //BepInEx.Bootstrap.Chainloader.
             if (lobby.crystalsDropItems)
             {
                 On.RoR2.Artifacts.SacrificeArtifactManager.OnServerCharacterDeath += No;
                 On.RoR2.CharacterBody.OnDeathStart += CrystalMeUp; // change artifact of sacrifice affects
             }
-            
+
+            if (lobby.vengeancifyBossTwo)
+            {
+                On.RoR2.WeeklyRun.OnServerBossAdded += DoppelGangify;
+            }
+
         }
+
+        private void DoppelGangify(On.RoR2.WeeklyRun.orig_OnServerBossAdded orig, WeeklyRun self, BossGroup bossGroup, CharacterMaster characterMaster)
+        {
+            orig(self, bossGroup, characterMaster);
+
+
+            // do the default
+            if (lobby.vengeancifyBossTwo && RunArtifactManager.instance.IsArtifactEnabled(ArtifactCatalog.FindArtifactDef("ShadowClone")))
+            {
+                characterMaster.inventory.SetEquipmentIndex(EquipmentIndex.None);
+                characterMaster.inventory.GiveItem(RoR2Content.Items.InvadingDoppelganger);
+                characterMaster.inventory.GiveItem(RoR2Content.Items.CutHp, 5); // cut hp a tad
+                characterMaster.inventory.GiveItem(RoR2Content.Items.BoostDamage, 1200); // multiply 0.1 to a billion
+            }
+        }
+
         private void UndoHooks(On.RoR2.WeeklyRun.orig_OnClientGameOver orig, WeeklyRun self, RunReport runReport)
         {
+            orig(self, runReport);
+
             if (lobby.crystalsDropItems)
             {
                 On.RoR2.Artifacts.SacrificeArtifactManager.OnServerCharacterDeath -= No;
                 On.RoR2.CharacterBody.OnDeathStart -= CrystalMeUp;
+            }
+
+            if (lobby.vengeancifyBossTwo)
+            {
+                On.RoR2.WeeklyRun.OnServerBossAdded -= DoppelGangify;
             }
         }
 
@@ -101,13 +129,13 @@ namespace ChromaticTrials
             {
                 if (RunArtifactManager.instance.IsArtifactEnabled(ArtifactCatalog.FindArtifactDef("Sacrifice")))
                     PickupDropletController.CreatePickupDroplet(GetItem(), self.corePosition, Vector3.up * 20f);
-            }            
+            }
 
             orig(self);
         }
 
         public PickupIndex GetItem()
-        {           
+        {
             return RoR2.Artifacts.SacrificeArtifactManager.dropTable.GenerateDrop(Run.instance.treasureRng);
         }
 
@@ -277,8 +305,6 @@ namespace ChromaticTrials
                 {
                     ProcessClick(self, lob);
                 }); // make it BOUTON
-
-                //strip.GetComponent<HGButton>().imageOnHover.sprite = ItemCatalog.GetItemDef(ItemCatalog.FindItemIndex("Hoof")).pickupIconSprite;
             }
 
             // TODO: update the leaderboards.json file format to be a lobbies.json and contain stuff
@@ -352,10 +378,11 @@ namespace ChromaticTrials
 
         private void RefreshLBFile()
         {
+            /*
             string jsonFile = JsonUtility.ToJson(lobbyList);
             FileStream fs = new(Assembly.GetExecutingAssembly().Location.Replace("ChromaticTrials.dll", "lobbies.json"), FileMode.Open);
             byte[] info = new UTF8Encoding(true).GetBytes(jsonFile);
-            fs.Write(info, 0, info.Length);
+            fs.Write(info, 0, info.Length); */
             //TODO: fix this code and make it function
         }
 
@@ -445,6 +472,7 @@ namespace ChromaticTrials
             Destroy(target);
         }
 
+        private void No<T>(T no) { }
         private void No<T, R>(T no, R nah) { }
         private void No<T, R, C>(T no, R nah, C nope) { }
 

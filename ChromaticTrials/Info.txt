@@ -520,3 +520,20 @@
 [Info   :SpeedyBird] Content (UnityEngine.RectTransform)
 [Info   :SpeedyBird] Content (UnityEngine.UI.VerticalLayoutGroup)
 [Info   :SpeedyBird] Pages (UnityEngine.UI.LayoutElement)
+
+<unlock>Artifacts.EliteOnly</unlock>
+    <unlock>Artifacts.Bomb</unlock>
+    <unlock>Artifacts.Command</unlock>
+    <unlock>Artifacts.Enigma</unlock>
+    <unlock>Artifacts.FriendlyFire</unlock>
+    <unlock>Artifacts.Glass</unlock>
+    <unlock>Artifacts.MixEnemy</unlock>
+    <unlock>Artifacts.MonsterTeamGainsItems</unlock>
+    <unlock>Artifacts.RandomSurvivorOnRespawn</unlock>
+    <unlock>Artifacts.Sacrifice</unlock>
+    <unlock>Artifacts.ShadowClone</unlock>
+    <unlock>Artifacts.SingleMonsterType</unlock>
+    <unlock>Artifacts.Swarms</unlock>
+    <unlock>Artifacts.TeamDeath</unlock>
+    <unlock>Artifacts.WeakAssKnees</unlock>
+    <unlock>Artifacts.WispOnDeath</unlock>

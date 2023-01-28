@@ -13,7 +13,7 @@ namespace ChromaticTrials
         public string time;
         public string lobbyName, hostUsername;
         public int stages;
-        public bool crystalsDropItems;
+        public bool crystalsDropItems, vengeancifyBossTwo;
         public int lobbyID;
     }
 }
