@@ -60,8 +60,10 @@ namespace ChromaticTrials
             On.RoR2.WeeklyRun.OverrideRuleChoices += MyRules;
             On.RoR2.WeeklyRun.ClientSubmitLeaderboardScore += SubmitToMe;
 
+            On.RoR2.WeeklyRun.Start += (orig, self) => { orig(self); UndoHooks(); }; // undo the hooks from the previous runs?
+            On.RoR2.UI.WeeklyRunScreenController.OnEnable += (orig, self) => { orig(self); UndoHooks(); };
+
             On.RoR2.WeeklyRun.Start += CreateHooks;
-            On.RoR2.WeeklyRun.OnClientGameOver += UndoHooks;
 
             On.RoR2.UI.WeeklyRunScreenController.OnEnable += SpawnHOOF;
 
@@ -89,7 +91,6 @@ namespace ChromaticTrials
             {
                 On.RoR2.WeeklyRun.OnServerBossAdded += DoppelGangify;
             }
-
         }
 
         private void DoppelGangify(On.RoR2.WeeklyRun.orig_OnServerBossAdded orig, WeeklyRun self, BossGroup bossGroup, CharacterMaster characterMaster)
@@ -107,17 +108,16 @@ namespace ChromaticTrials
             }
         }
 
-        private void UndoHooks(On.RoR2.WeeklyRun.orig_OnClientGameOver orig, WeeklyRun self, RunReport runReport)
+        private void UndoHooks()
         {
-            orig(self, runReport);
-
-            if (lobby.crystalsDropItems)
+            // always undo hooks
+            if (true || lobby.crystalsDropItems)
             {
                 On.RoR2.Artifacts.SacrificeArtifactManager.OnServerCharacterDeath -= No;
                 On.RoR2.CharacterBody.OnDeathStart -= CrystalMeUp;
             }
 
-            if (lobby.vengeancifyBossTwo)
+            if (true || lobby.vengeancifyBossTwo)
             {
                 On.RoR2.WeeklyRun.OnServerBossAdded -= DoppelGangify;
             }
@@ -224,6 +224,14 @@ namespace ChromaticTrials
             newLb.transform.Find("HeaderContainer").Find("LeaderboardButton").gameObject.GetComponent<LanguageTextMeshController>().enabled = false;
             newLb.transform.Find("HeaderContainer").Find("LeaderboardButton").gameObject.GetComponent<HGButton>().updateTextOnHover = false;
 
+
+            // update the "leaderboards" tab 
+            newLb.transform.Find("HeaderContainer").Find("GenericGlyph (Left)").gameObject.SetActive(true);
+            newLb.transform.Find("HeaderContainer").Find("GenericGlyph (Left)").gameObject.GetComponent<Image>().enabled = true;
+            newLb.transform.Find("HeaderContainer").Find("GenericGlyph (Right)").gameObject.SetActive(true);
+            newLb.transform.Find("HeaderContainer").Find("GenericGlyph (Right)").gameObject.GetComponent<Image>().enabled = true;
+
+
             // fix the description and shiss
             Transform mainPanel = self.transform.Find("Main Panel");
             mainPanel.Find("Title").gameObject.GetComponent<HGTextMeshProUGUI>().text = RainbowString("Chromatic Trials");
@@ -257,13 +265,12 @@ namespace ChromaticTrials
             rainbo.AddComponent<Speen>().rt = rainbo.GetComponent<RectTransform>(); // make it speeeeen
 
             // override the size of the leaderboard
-            /*
             RectTransform rectTransform = newLb.GetComponent<RectTransform>();
             rectTransform.anchorMin = new Vector2(0.60f, 0.1f); // bottom left corner
             rectTransform.anchorMax = new Vector2(0.95f, 0.9f); // top right corner (MUST BE BIGGER THAN THE OTHER ONE)
             rectTransform.sizeDelta = Vector2.zero; // autoscale?
             rectTransform.anchoredPosition = Vector2.zero;
-            */
+            
 
             // shift newLb down a layer
             newLb = newLb.transform.Find("Pages").gameObject;
@@ -283,6 +290,9 @@ namespace ChromaticTrials
             {
                 GameObject runList = self.leaderboard.transform.GetParent().GetParent()
                     .Find("Pages").Find("GlobalPage").Find("LeaderboardArea").Find("Content").gameObject;
+                runList.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.MinSize; // FIX AUTOSCALE
+                runList.GetComponent<VerticalLayoutGroup>().spacing = 0f;
+                runList.transform.GetParent().gameObject.AddComponent<EpicScrollRect>();
 
                 GameObject strip = Instantiate(bundle.LoadAsset<GameObject>("LobbyStrip")); // get the strip prefab
 
@@ -315,6 +325,9 @@ namespace ChromaticTrials
             GameObject stripPrefab = self.leaderboard.stripPrefab; // get the strip prefab
             GameObject runList = self.leaderboard.transform.GetParent().GetParent()
                 .Find("Pages").Find("FriendsPage").Find("LeaderboardArea").Find("Content").gameObject;
+            runList.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.MinSize; // FIX AUTOSCALE
+            runList.GetComponent<VerticalLayoutGroup>().spacing = 0f;
+            runList.transform.GetParent().gameObject.AddComponent<EpicScrollRect>();
 
             // clear the current leaderboard
             foreach (Transform t in runList.GetComponentInChildren<Transform>())
@@ -324,7 +337,7 @@ namespace ChromaticTrials
             }
 
             // uh oh 
-            for (int i = 0; i < lobby.leaderboard.Count && i < 16; i++)
+            for (int i = 0; i < lobby.leaderboard.Count; i++)
             {
                 RunData data = lobby.leaderboard[i];
 
