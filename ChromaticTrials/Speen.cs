@@ -1,24 +1,34 @@
-﻿using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.UI;
+﻿using System;
+using System.Collections.Generic;
+using UnityEngine;
 
 namespace ChromaticTrials
 {
-    public class EpicScrollRect : ScrollRect
+    public class Speen : MonoBehaviour
     {
-        private const int scrollSpeed = 20;
-        public override void Awake()
+        public RectTransform rt;
+        private bool smalling;
+        private float spinspeed = 0.005f;
+        public void FixedUpdate()
         {
-            content = gameObject.transform.Find("Content").gameObject.GetComponent<RectTransform>(); // get the rect transform automatically
-            scrollSensitivity = scrollSpeed;
-            viewport = gameObject.GetComponent<RectTransform>();
-            horizontal = false;
-            gameObject.AddComponent<RectMask2D>(); // add rect mask 2d.
-            inertia = true;
-        }
+            if (rt != null)
+            {
+                rt.Rotate(0f, 0f, 0.4f);
 
-        public override void OnBeginDrag(PointerEventData eventData) { }
-        public override void OnDrag(PointerEventData eventData) { }
-        public override void OnEndDrag(PointerEventData eventData) { }
+                // scale size
+                if (smalling)
+                {
+                    rt.anchorMin = new Vector2(rt.anchorMin.x + spinspeed, rt.anchorMin.y + spinspeed);
+                    rt.anchorMax = new Vector2(rt.anchorMax.x - spinspeed, rt.anchorMax.y - spinspeed);
+                    if (rt.anchorMin.x >= -.65f) smalling = false;
+                }
+                else
+                {
+                    rt.anchorMin = new Vector2(rt.anchorMin.x - spinspeed, rt.anchorMin.y - spinspeed);
+                    rt.anchorMax = new Vector2(rt.anchorMax.x + spinspeed, rt.anchorMax.y + spinspeed);
+                    if (rt.anchorMin.x <= -1f) smalling = true;
+                }
+            }
+        }
     }
 }

@@ -9,7 +9,7 @@ namespace ChromaticTrials
         [UnityEngine.SerializeField]
         public List<RunData> leaderboard;
         public string seed;
-        public List<string> artifacts, survivors;
+        public List<string> artifacts, survivors, freeItems, mods;
         public string time;
         public string lobbyName, hostUsername;
         public int stages;

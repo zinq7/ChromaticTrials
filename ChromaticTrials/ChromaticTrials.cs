@@ -10,6 +10,7 @@ using RoR2.ExpansionManagement;
 using RoR2.UI; // LOBBYCONFIG API is for adding bars such as "expansions"
 using System.Text;
 using R2API;
+using System;
 
 namespace ChromaticTrials
 {
@@ -36,6 +37,7 @@ namespace ChromaticTrials
         public static AssetBundle bundle;
         public static LobbyList lobbyList;
 
+        public static bool initialSpawn = true;
 
         //The Awake() method is run at the very start when the game is initialized.
         public void Awake()
@@ -60,7 +62,7 @@ namespace ChromaticTrials
             On.RoR2.WeeklyRun.OverrideRuleChoices += MyRules;
             On.RoR2.WeeklyRun.ClientSubmitLeaderboardScore += SubmitToMe;
 
-            On.RoR2.CharacterBody.Start += GiveZinqLoot;
+            On.RoR2.CharacterBody.Start += GainFreeLoot; // loot hook
 
             On.RoR2.WeeklyRun.Start += (orig, self) => { orig(self); UndoHooks(); }; // undo the hooks from the previous runs?
             On.RoR2.UI.WeeklyRunScreenController.OnEnable += (orig, self) => { orig(self); UndoHooks(); }; // overly undo the hooks in case
@@ -79,16 +81,20 @@ namespace ChromaticTrials
             // This line of log will appear in the bepinex console when the Awake method is done.
             Log.LogInfo(nameof(Awake) + " done.");
         }
-
-        private void GiveZinqLoot(On.RoR2.CharacterBody.orig_Start orig, CharacterBody self)
+        private void GainFreeLoot(On.RoR2.CharacterBody.orig_Start orig, CharacterBody self)
         {
             orig(self);
 
-            if (self.isPlayerControlled)
+            if (initialSpawn && self.isPlayerControlled)
             {
-                self.inventory.GiveItem(RoR2Content.Items.Hoof, 25);
-                self.inventory.GiveItem(RoR2Content.Items.Crowbar, 25);
-                self.inventory.GiveItem(RoR2Content.Items.Feather, 25);
+                foreach (string str in lobby.freeItems)
+                {
+                    string[] id = str.Split('#');
+                    string item = id[0];
+                    int num = id.Length == 2 ? Convert.ToInt32(id[1]) : 1;
+                    self.inventory.GiveItemString(item, num);
+                }
+                initialSpawn = false;
             }
         }
 
@@ -123,6 +129,8 @@ namespace ChromaticTrials
         private void CreateHooks(On.RoR2.WeeklyRun.orig_Start orig, WeeklyRun self)
         {
             orig(self);
+
+            initialSpawn = true;
 
             //BepInEx.Bootstrap.Chainloader.
             if (lobby.crystalsDropItems)
@@ -183,20 +191,6 @@ namespace ChromaticTrials
             return RoR2.Artifacts.SacrificeArtifactManager.dropTable.GenerateDrop(Run.instance.treasureRng);
         }
 
-        private void BigCrystalLoot(On.RoR2.Artifacts.SacrificeArtifactManager.orig_CalcCardWeight orig, DirectorCard card, ref float weight)
-        {
-
-            if (card.spawnCard.name == "CrystalSpawnCard")
-            {
-                weight = 100f;
-            }
-
-            Logger.LogInfo(card.spawnCard.name + " -> " + weight);
-
-            orig(card, ref weight);
-
-        }
-
         private void SubmitToMe(On.RoR2.WeeklyRun.orig_ClientSubmitLeaderboardScore orig, WeeklyRun self, RunReport runReport)
         {
             RunData finishedRun = new();
@@ -205,16 +199,16 @@ namespace ChromaticTrials
             finishedRun.timeM = (int)time / 60;
             time %= 60;
             finishedRun.timeS = (int)time;
-            finishedRun.timeL = (int)(time - (int)time);
-            finishedRun.chara = runReport.FindFirstPlayerInfo().bodyName;
+            finishedRun.timeL = (int)(((float)time - (int)time) * 100);
+            finishedRun.chara = SurvivorCatalog.FindSurvivorDefFromBody(BodyCatalog.FindBodyPrefab(runReport.FindFirstPlayerInfo().bodyName)).cachedName;
             finishedRun.user = username; // get username
 
-            RunData betterRun = lobby.leaderboard.Find((x) => x.chara == finishedRun.chara && x.timeS * 10000 + x.timeM * 100 + x.timeL <
+            RunData betterRun = lobby.leaderboard.Find((x) => x.chara == finishedRun.chara && x.timeS * 10000 + x.timeM * 100 + x.timeL <=
                finishedRun.timeS * 10000 + finishedRun.timeM * 100 + finishedRun.timeL);
 
             if (betterRun == null)
             {
-                lobby.leaderboard.Add(finishedRun);
+                lobby.leaderboard.Add(finishedRun); // don't just add it, fix but wtvr
             }
 
             RefreshLBFile();
@@ -332,6 +326,17 @@ namespace ChromaticTrials
 
             foreach (Lobby lob in lobbyList.lobbies)
             {
+                Transform header = self.leaderboard.transform.GetParent().GetParent().Find("Pages").Find("GlobalPage").Find("LeaderboardHeader");
+                
+                header.Find("RankLabel").gameObject.GetComponent<HGTextMeshProUGUI>().text = "Submissions";
+                header.Find("RankLabel").gameObject.GetComponent<LanguageTextMeshController>().enabled = false; // do this shiss
+
+                header.Find("UsernameLabel").gameObject.GetComponent<HGTextMeshProUGUI>().text = "Lobby Name";
+                header.Find("UsernameLabel").gameObject.GetComponent<LanguageTextMeshController>().enabled = false;
+
+                header.Find("TimeLabel").gameObject.GetComponent<HGTextMeshProUGUI>().text = "Stage Count";
+                header.Find("TimeLabel").gameObject.GetComponent<LanguageTextMeshController>().enabled = false;
+
                 GameObject runList = self.leaderboard.transform.GetParent().GetParent()
                     .Find("Pages").Find("GlobalPage").Find("LeaderboardArea").Find("Content").gameObject;
                 runList.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.MinSize; // FIX AUTOSCALE
@@ -360,8 +365,6 @@ namespace ChromaticTrials
                     ProcessClick(self, lob);
                 }); // make it BOUTON
             }
-
-            // TODO: update the leaderboards.json file format to be a lobbies.json and contain stuff
         }
 
         public void UpdateLobby(WeeklyRunScreenController self)
@@ -390,13 +393,15 @@ namespace ChromaticTrials
                 strip.transform.Find("RankLabel").gameObject.GetComponent<HGTextMeshProUGUI>().text = (i + 1) + "";
                 strip.transform.Find("UsernameLabel").gameObject.GetComponent<HGTextMeshProUGUI>().text = data.user;
                 strip.transform.Find("TimeLabel").gameObject.GetComponent<HGTextMeshProUGUI>().text = data.timeM + ":" + To2(data.timeS) + "." + To2(data.timeL);
-                strip.transform.Find("SurvivorImagePanel").Find("SurvivorImage").gameObject.GetComponent<RawImage>().texture = ItemCatalog.GetItemDef(ItemCatalog.FindItemIndex("Hoof")).pickupIconSprite.texture;
+                strip.transform.Find("SurvivorImagePanel").Find("SurvivorImage").gameObject.GetComponent<RawImage>().texture = SurvivorCatalog.GetSurvivorPortrait(SurvivorCatalog.FindSurvivorIndex(data.chara)); // get image
+
 
                 // HIDE OUT NON YOU USERS
                 if (data.user != username)
                 {
                     strip.transform.Find("IsMeHighlight").gameObject.SetActive(false);
                 }
+
                 strip.transform.position = new Vector2(-50f, -50f);
             }
         }
