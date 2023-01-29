@@ -81,6 +81,7 @@ namespace ChromaticTrials
             // This line of log will appear in the bepinex console when the Awake method is done.
             Log.LogInfo(nameof(Awake) + " done.");
         }
+
         private void GainFreeLoot(On.RoR2.CharacterBody.orig_Start orig, CharacterBody self)
         {
             orig(self);
