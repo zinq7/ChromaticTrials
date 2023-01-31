@@ -5,12 +5,14 @@ using UnityEngine.UI;
 using System.Reflection;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using RoR2.ExpansionManagement;
 using RoR2.UI; // LOBBYCONFIG API is for adding bars such as "expansions"
 using System.Text;
 using R2API;
 using System;
+using System.Collections.ObjectModel;
 
 namespace ChromaticTrials
 {
@@ -36,6 +38,7 @@ namespace ChromaticTrials
         public static string username = "zoinq";
         public static AssetBundle bundle;
         public static LobbyList lobbyList;
+        public static List<string> enabledMods = new List<string>();
 
         public static bool initialSpawn = true;
 
@@ -57,10 +60,12 @@ namespace ChromaticTrials
             On.RoR2.UI.WeeklyRunScreenController.Update += No;
 
             On.RoR2.UI.WeeklyRunScreenController.OnEnable += SpawnHOOF;
-
+             
             On.RoR2.WeeklyRun.GenerateSeedForNewRun += SelectLobbySeed;
             On.RoR2.WeeklyRun.OverrideRuleChoices += MyRules;
             On.RoR2.WeeklyRun.ClientSubmitLeaderboardScore += SubmitToMe;
+
+            
 
             On.RoR2.CharacterBody.Start += GainFreeLoot; // loot hook
 
@@ -73,6 +78,8 @@ namespace ChromaticTrials
 
             On.RoR2.UI.WeeklyRunScreenController.OnEnable += SpawnHOOF;
 
+            On.RoR2.CharacterSelectBarController.Build += BuildWhatIWant;
+
             SteamworksClientManager.onLoaded += () =>
             {
                 username = SteamworksClientManager.instance.steamworksClient.Username; // save the STEAM username of the player
@@ -80,6 +87,33 @@ namespace ChromaticTrials
 
             // This line of log will appear in the bepinex console when the Awake method is done.
             Log.LogInfo(nameof(Awake) + " done.");
+        }
+
+        private void BuildWhatIWant(On.RoR2.CharacterSelectBarController.orig_Build orig, CharacterSelectBarController self)
+        {
+            // ESSENTIALLY ORIG(SELF) BUT WITH A CHANGE IN THE MIDDLE
+            List<SurvivorDef> list = new List<SurvivorDef>();
+            foreach (SurvivorDef orderedSurvivorDef in SurvivorCatalog.orderedSurvivorDefs)
+            {
+                if (self.ShouldDisplaySurvivor(orderedSurvivorDef) && orderedSurvivorDef.cachedName.Contains("C"))
+                {
+                    list.Add(orderedSurvivorDef);
+                }
+            }
+            int count = list.Count;
+            int desiredCount = Math.Max(CharacterSelectBarController.CalcGridCellCount(count, self.iconContainerGrid.constraintCount) - count, 0);
+            self.survivorIconControllers.AllocateElements(count);
+            self.fillerIcons.AllocateElements(desiredCount);
+            self.fillerIcons.MoveElementsToContainerEnd();
+            ReadOnlyCollection<SurvivorIconController> elements = self.survivorIconControllers.elements;
+
+            for (int i = 0; i < count; i++)
+            {
+                SurvivorDef survivorDef = list[i];
+                SurvivorIconController survivorIconController = elements[i];
+                survivorIconController.survivorDef = survivorDef;
+                survivorIconController.hgButton.defaultFallbackButton = i == 0;
+            }
         }
 
         private void GainFreeLoot(On.RoR2.CharacterBody.orig_Start orig, CharacterBody self)
@@ -249,6 +283,14 @@ namespace ChromaticTrials
         }
         private async void SpawnHOOF(On.RoR2.UI.WeeklyRunScreenController.orig_OnEnable orig, WeeklyRunScreenController self)
         {
+            enabledMods.Clear();
+
+            foreach (var info in BepInEx.Bootstrap.Chainloader.PluginInfos)
+            {
+                enabledMods.Add(info.Key); // update the mods upon entering the SCENE
+            }
+
+            
             GameObject newLb = self.leaderboard.gameObject.transform.GetParent().GetParent().gameObject; // ignore me
 
             // update the "global leaderboards" tab into "lobbyList" tab
