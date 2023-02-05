@@ -13,6 +13,7 @@ using System.Text;
 using R2API;
 using System;
 using System.Collections.ObjectModel;
+using static RoR2.UI.CharacterSelectController;
 
 namespace ChromaticTrials
 {
@@ -50,35 +51,40 @@ namespace ChromaticTrials
             //Init our logging class so that we can properly log for debugging
             Log.Init(Logger);
 
-
-            On.RoR2.DisableIfGameModded.OnEnable += No;
+            On.RoR2.DisableIfGameModded.OnEnable +=  No; // re-enable "Trials"
 
             On.RoR2.UI.WeeklyRunScreenController.InitializeLeaderboardInfo += No;
             On.RoR2.UI.WeeklyRunScreenController.UpdateLeaderboard += No;
             On.RoR2.UI.WeeklyRunScreenController.SetCurrentLeaderboard += No;
             On.RoR2.UI.WeeklyRunScreenController.UpdateLeaderboard += No;
-            On.RoR2.UI.WeeklyRunScreenController.Update += No;
+            On.RoR2.UI.WeeklyRunScreenController.Update += No; // don't do all the Normal "WeeklyRun" stuff
 
             On.RoR2.UI.WeeklyRunScreenController.OnEnable += SpawnHOOF;
-             
+
             On.RoR2.WeeklyRun.GenerateSeedForNewRun += SelectLobbySeed;
             On.RoR2.WeeklyRun.OverrideRuleChoices += MyRules;
             On.RoR2.WeeklyRun.ClientSubmitLeaderboardScore += SubmitToMe;
 
-            
-
             On.RoR2.CharacterBody.Start += GainFreeLoot; // loot hook
 
-            On.RoR2.WeeklyRun.Start += (orig, self) => { orig(self); UndoHooks(); }; // undo the hooks from the previous runs?
             On.RoR2.UI.WeeklyRunScreenController.OnEnable += (orig, self) => { orig(self); UndoHooks(); }; // overly undo the hooks in case
-            On.RoR2.WeeklyRun.Start += CreateHooks;
+            On.RoR2.WeeklyRun.Start += (orig, self) =>
+            {
+                UndoHooks(); // undo ALL hooks
+                CreateHooks(); // create NECCESARY hooks (based on the lobby)
+                EditCrystal(self);
+                orig(self);
+            };
+            //On.RoR2.UI.CharacterSelectController.BuildSkillStripDisplayData += FixUnlocks;
 
             On.RoR2.WeeklyRun.AdvanceStage += BetterVictoryCheck;
             On.RoR2.Run.AdvanceStage += DoTrialExtension;
 
             On.RoR2.UI.WeeklyRunScreenController.OnEnable += SpawnHOOF;
 
-            On.RoR2.CharacterSelectBarController.Build += BuildWhatIWant;
+            On.RoR2.CharacterSelectBarController.Build += BuildWhatIWant; // builds only allowed survivors
+
+            On.RoR2.UI.MainMenu.MainMenuController.Awake += (orig, self) => { orig(self); lobby = null; }; // clear lobby
 
             SteamworksClientManager.onLoaded += () =>
             {
@@ -86,50 +92,71 @@ namespace ChromaticTrials
             };
 
             // This line of log will appear in the bepinex console when the Awake method is done.
-            Log.LogInfo(nameof(Awake) + " done.");
+            Log.LogInfo(nameof(Awake) + " done.");            
+        }
+
+        private void EditCrystal(WeeklyRun weeklyRun)
+        {
+            
         }
 
         private void BuildWhatIWant(On.RoR2.CharacterSelectBarController.orig_Build orig, CharacterSelectBarController self)
         {
-            // ESSENTIALLY ORIG(SELF) BUT WITH A CHANGE IN THE MIDDLE
-            List<SurvivorDef> list = new List<SurvivorDef>();
-            foreach (SurvivorDef orderedSurvivorDef in SurvivorCatalog.orderedSurvivorDefs)
+            if (lobby is not null)
             {
-                if (self.ShouldDisplaySurvivor(orderedSurvivorDef) && orderedSurvivorDef.cachedName.Contains("C"))
+                // ESSENTIALLY ORIG(SELF) BUT WITH A CHANGE IN THE MIDDLE
+                List<SurvivorDef> list = new List<SurvivorDef>();
+                foreach (SurvivorDef orderedSurvivorDef in SurvivorCatalog.orderedSurvivorDefs)
                 {
-                    list.Add(orderedSurvivorDef);
+                    if (self.ShouldDisplaySurvivor(orderedSurvivorDef) && orderedSurvivorDef.cachedName.Contains("T"))
+                    {
+                        list.Add(orderedSurvivorDef); // should only be Treebot and Toolbot
+                    }
                 }
-            }
-            int count = list.Count;
-            int desiredCount = Math.Max(CharacterSelectBarController.CalcGridCellCount(count, self.iconContainerGrid.constraintCount) - count, 0);
-            self.survivorIconControllers.AllocateElements(count);
-            self.fillerIcons.AllocateElements(desiredCount);
-            self.fillerIcons.MoveElementsToContainerEnd();
-            ReadOnlyCollection<SurvivorIconController> elements = self.survivorIconControllers.elements;
 
-            for (int i = 0; i < count; i++)
+                int count = list.Count;
+                int desiredCount = Math.Max(CharacterSelectBarController.CalcGridCellCount(count, self.iconContainerGrid.constraintCount) - count, 0);
+                self.survivorIconControllers.AllocateElements(count);
+                self.fillerIcons.AllocateElements(desiredCount);
+                self.fillerIcons.MoveElementsToContainerEnd();
+                ReadOnlyCollection<SurvivorIconController> elements = self.survivorIconControllers.elements;
+
+                for (int i = 0; i < count; i++)
+                {
+                    SurvivorDef survivorDef = list[i];
+                    SurvivorIconController survivorIconController = elements[i];
+                    survivorIconController.survivorDef = survivorDef;
+                    survivorIconController.hgButton.defaultFallbackButton = i == 0; // auto falls back to whomever the first character is
+                }
+            } else
             {
-                SurvivorDef survivorDef = list[i];
-                SurvivorIconController survivorIconController = elements[i];
-                survivorIconController.survivorDef = survivorDef;
-                survivorIconController.hgButton.defaultFallbackButton = i == 0;
+                orig(self);
             }
+            
         }
 
         private void GainFreeLoot(On.RoR2.CharacterBody.orig_Start orig, CharacterBody self)
         {
             orig(self);
 
-            if (initialSpawn && self.isPlayerControlled)
+            if (lobby is not null)
             {
-                foreach (string str in lobby.freeItems)
+                if (initialSpawn && self.isPlayerControlled)
                 {
-                    string[] id = str.Split('#');
-                    string item = id[0];
-                    int num = id.Length == 2 ? Convert.ToInt32(id[1]) : 1;
-                    self.inventory.GiveItemString(item, num);
+                    foreach (string str in lobby.freeItems)
+                    {
+                        string[] id = str.Split('#');
+                        string item = id[0];
+                        int num = id.Length == 2 ? Convert.ToInt32(id[1]) : 1;
+                        self.inventory.GiveItemString(item, num);
+                    }
+                    initialSpawn = false;
                 }
-                initialSpawn = false;
+
+                if (self.baseNameToken.Contains("CRYSTAL"))
+                {
+                    self.gameObject.AddComponent<Rainbow>().mat = self.gameObject.transform.Find("ModelBase").Find("Mesh").gameObject.GetComponent<MeshRenderer>().materials;
+                }
             }
         }
 
@@ -161,10 +188,8 @@ namespace ChromaticTrials
             orig.Invoke(self, nextScene);
         }
 
-        private void CreateHooks(On.RoR2.WeeklyRun.orig_Start orig, WeeklyRun self)
+        private void CreateHooks()
         {
-            orig(self);
-
             initialSpawn = true;
 
             //BepInEx.Bootstrap.Chainloader.
@@ -383,7 +408,7 @@ namespace ChromaticTrials
                 GameObject runList = self.leaderboard.transform.GetParent().GetParent()
                     .Find("Pages").Find("GlobalPage").Find("LeaderboardArea").Find("Content").gameObject;
                 runList.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.MinSize; // FIX AUTOSCALE
-                runList.GetComponent<VerticalLayoutGroup>().spacing = 0f;
+                runList.GetComponent<VerticalLayoutGroup>().spacing = 1f;
                 runList.transform.GetParent().gameObject.AddComponent<EpicScrollRect>();
 
                 GameObject strip = Instantiate(bundle.LoadAsset<GameObject>("LobbyStrip")); // get the strip prefab
@@ -416,7 +441,7 @@ namespace ChromaticTrials
             GameObject runList = self.leaderboard.transform.GetParent().GetParent()
                 .Find("Pages").Find("FriendsPage").Find("LeaderboardArea").Find("Content").gameObject;
             runList.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.MinSize; // FIX AUTOSCALE
-            runList.GetComponent<VerticalLayoutGroup>().spacing = 0f;
+            runList.GetComponent<VerticalLayoutGroup>().spacing = 1f;
             runList.transform.GetParent().gameObject.AddComponent<EpicScrollRect>();
 
             // clear the current leaderboard
@@ -565,7 +590,7 @@ namespace ChromaticTrials
                 Logger.LogInfo(path + comp);
 
             for (int i = 0; i < obj.transform.childCount; i++)
-                ListAllComponents(obj.transform.GetChild(i).gameObject, " -> " + path + obj.name);
+                ListAllComponents(obj.transform.GetChild(i).gameObject, path + obj.name + " -> ");
 
         }
 
